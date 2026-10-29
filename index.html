@@ -261,6 +261,30 @@ body.pc .toolbar .search{width:280px;margin:0;height:44px}
 .row .n{font-weight:700;font-size:15px;letter-spacing:-.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .s{font-size:12.5px;color:var(--sub);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .h{flex:0 0 auto;font:700 14px var(--head);text-align:right}
+/* 자동 저장 상태 */
+.savestat{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-top:10px;cursor:pointer;border:2px solid transparent}
+.savestat:hover{border-color:var(--navy)}
+.savestat .dot{flex:0 0 12px;height:12px;border-radius:50%}
+.savestat b{display:block;font-size:14px}
+.savestat small{display:block;font-size:12.5px;color:var(--sub);margin-top:1px}
+.savestat.on{background:#e3efe9;box-shadow:inset 2px 2px 5px rgba(60,110,90,.25),inset -2px -2px 5px rgba(255,255,255,.8)}
+.savestat.on .dot{background:#2f8a5f;box-shadow:0 0 0 3px rgba(47,138,95,.2)}
+.savestat.on b{color:#1f6b47}
+.savestat.off{background:#f6e4df;box-shadow:inset 2px 2px 5px rgba(160,80,60,.22),inset -2px -2px 5px rgba(255,255,255,.8)}
+.savestat.off .dot{background:transparent;border:2.5px solid var(--red)}
+.savestat.off b{color:var(--red)}
+.savestat.busy .dot{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.savepill{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer}
+.savepill i{width:8px;height:8px;border-radius:50%}
+.savepill.on{background:#e3efe9;color:#1f6b47}.savepill.on i{background:#2f8a5f}
+.savepill.off{background:#f6e4df;color:var(--red)}.savepill.off i{border:2px solid var(--red)}
+/* 매장별 막대 */
+.tbl .bcol{width:22%}
+@media (max-width:699px){.tbl .bcol{display:none}}
+.sbar{height:8px;border-radius:99px;background:var(--sink);overflow:hidden;min-width:60px}
+.sbar i{display:block;height:100%;background:var(--navy);border-radius:99px}
+.sbar i.d{background:var(--brown)}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--raise);color:var(--ink);font-weight:700;padding:12px 18px;border-radius:12px;font-size:14px;z-index:70;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--sh-pop);border:2px solid var(--navy)}
 #toast.on{opacity:1}
 @media (min-width:1024px){body.pc #toast{bottom:28px}}
@@ -381,6 +405,11 @@ function agg(rows) {
 }
 const rateCls = (r) => r == null ? 'n' : r >= 100 ? 'g' : r >= 60 ? 'w' : 'b';
 const rateColor = (r) => r == null ? '#cbc2b0' : r >= 100 ? 'var(--navy)' : r >= 60 ? '#a98a55' : 'var(--red)';
+const DEPTS = /현대|갤러리아|신세계|롯데/;
+function shopRows(list, total) {
+  const max = Math.max(1, ...list.map(x => x.a || 0));
+  return list.map(x => `<tr><td class="l"><b>${esc(x.s)}</b>${DEPTS.test(x.s) ? ' <span class="tag t-warn">백화점</span>' : ''}</td><td>${x.n != null ? fmt(x.n) : ''}</td><td>${fmt(x.c)}</td><td><b>${fmt(x.a)}</b></td><td>${x.c && x.a ? fmt(x.a / x.c, 1) : '–'}</td><td>${total && x.a ? fmt(x.a / total * 100) + '%' : ''}</td><td class="bcol"><div class="sbar"><i class="${DEPTS.test(x.s) ? 'd' : ''}" style="width:${(x.a || 0) / max * 100}%"></i></div></td></tr>`).join('');
+}
 const years = () => [...new Set(DB.events.map(e => e.y))].sort();
 const sidoS = (s) => ({'대전광역시': '대전', '충청북도': '충북', '충청남도': '충남', '세종특별자치시': '세종'})[s] || s;
 
@@ -400,14 +429,28 @@ function renderTabs() {
         <div class="switch ${S.edit ? 'on' : ''}" id="editSw"><span>편집 모드</span><i></i></div>
         ${S.edit ? `<div style="margin:8px 2px 0;line-height:1.5">행을 클릭하면 오른쪽에서 수정합니다.</div>` : ''}
         ${S.dirty.size ? `<div class="savebox"><b>${repoInfo().token ? '저장 중이거나 실패한 변경' : '저장 안 된 변경'} ${S.dirty.size}건</b><div style="display:flex;gap:6px;margin-top:8px"><button class="btn blue sm" id="saveGh">${repoInfo().token ? '다시 저장' : 'GitHub에 저장'}</button><button class="btn sm" id="saveFile">파일 받기</button></div></div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:12px"><button class="btn sm" id="ghSet">${repoInfo().token ? '자동 저장 켜짐' : '자동 저장 켜기'}</button><button class="btn sm" id="lockBtn">잠금</button></div>
+        ${saveStatHtml()}
+        <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm" id="lockBtn">잠금</button></div>
       </div>` : '');
   $$('#tabs button[data-t]').forEach(b => b.onclick = () => { S.tab = b.dataset.t; render(); scrollTo(0, 0); });
   const sw = $('#editSw'); if (sw) sw.onclick = () => { S.edit = !S.edit; render(); };
   const sg = $('#saveGh'); if (sg) sg.onclick = saveGitHub;
   const sf = $('#saveFile'); if (sf) sf.onclick = saveFile;
-  const gs = $('#ghSet'); if (gs) gs.onclick = ghSettings;
+  $$('[data-ghset]').forEach(b => b.onclick = ghSettings);
   const lb = $('#lockBtn'); if (lb) lb.onclick = () => { if (S.dirty.size && !confirm('저장 안 된 변경이 있습니다. 잠글까요?')) return; S.dirty.clear(); ls(KEY, null); location.reload(); };
+}
+let SAVE = { busy: false, last: null, err: null };
+function saveStatHtml() {
+  const on = !!repoInfo().token;
+  const cls = SAVE.busy ? 'on busy' : on ? (SAVE.err ? 'off' : 'on') : 'off';
+  const title = SAVE.busy ? '저장 중…' : on ? (SAVE.err ? '자동 저장 오류' : '자동 저장 켜짐') : '자동 저장 꺼짐';
+  const sub = SAVE.busy ? 'GitHub에 올리는 중' : on ? (SAVE.err ? esc(SAVE.err) : (SAVE.last ? `마지막 저장 ${SAVE.last}` : '「적용」을 누르면 바로 저장')) : '눌러서 켜기 · 지금은 저장 안 됨';
+  return `<div class="savestat ${cls}" data-ghset title="자동 저장 설정"><span class="dot"></span><div><b>${title}</b><small>${sub}</small></div></div>`;
+}
+function savePill() {
+  if (!S.edit) return '';
+  const on = !!repoInfo().token && !SAVE.err;
+  return `<span class="savepill ${on ? 'on' : 'off'}" data-ghset><i></i>${on ? '자동 저장 켜짐' : '자동 저장 꺼짐'}</span>`;
 }
 function render() {
   renderTabs();
@@ -425,6 +468,7 @@ function bind(v) {
   $$('[data-sido]', v).forEach(b => b.onclick = () => { S.aptSido = b.dataset.sido; render(); });
   $$('[data-ast]', v).forEach(b => b.onclick = () => { S.aptSt = b.dataset.ast; render(); });
   $$('[data-goto]', v).forEach(b => b.onclick = (e) => { e.preventDefault(); S.tab = b.dataset.goto; render(); scrollTo(0, 0); });
+  $$('[data-ghset]', v).forEach(b => b.onclick = ghSettings);
   const nb = $('#newEv', v); if (nb) nb.onclick = () => openEvent(null);
   const na = $('#newApt', v); if (na) na.onclick = () => openApt(null);
   for (const [id, k] of [['q', 'q'], ['aq', 'aptQ']]) {
@@ -478,6 +522,10 @@ function vHome() {
     <div>${hostRows ? `<h2 class="sec">주관사별 성과 (${S.year}년) <small>세대당 = 판매 ÷ 세대 (만원)</small></h2>
       <div class="card scrollx" style="padding:4px 6px"><table class="tbl num"><thead><tr><th class="l">주관사</th><th>건수</th><th>세대</th><th>판매</th><th>달성률</th><th>세대당</th></tr></thead><tbody>${hostRows}</tbody></table></div>` : ''}</div>
   </div>
+  ${(() => { const agg2 = {}; let ta = 0; DB.events.filter(e => e.y === S.year && e.shops).forEach(e => e.shops.forEach(x => { const r = agg2[x.s] = agg2[x.s] || { s: x.s, n: 0, c: 0, a: 0 }; r.n++; r.c += x.c || 0; r.a += x.a || 0; ta += x.a || 0; }));
+    const list = Object.values(agg2).sort((a, b) => b.a - a.a); if (!list.length) return '';
+    const nEv = DB.events.filter(e => e.y === S.year && e.shops).length;
+    return `<h2 class="sec">매장별 실적 (${S.year}년) <small>지점별실적 시트 · 박람회 ${nEv}건 기준</small></h2><div class="tblwrap" style="max-height:${document.body.classList.contains('pc') ? '520px' : 'none'}"><table class="tbl num"><thead><tr><th class="l">매장</th><th>박람회</th><th>건수</th><th>금액</th><th>객단가</th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(list, ta)}</tbody></table></div>`; })()}
   <div class="foot">· 합계는 각 박람회 행을 더해 계산합니다. 원본 시트의 월 합계 셀과 일부 다를 수 있습니다(예: 24년 2월 DVM, 25년 마감건수).<br>· 달성률 = 판매금액 ÷ 목표 (목표가 있는 박람회만).</div>`;
 }
 
@@ -523,7 +571,7 @@ function vListPC() {
       + r.map(e => `<tr class="click ${S.dirty.has(e.id) ? 'dirty' : ''}" data-ev="${e.id}"><td class="l">${esc(e.date)}</td><td class="l">${e.wk ? esc(e.wk) : ''}</td><td class="l wrap">${evTags(e)}${esc(e.name)}</td><td class="l">${esc(e.host || '')}</td><td class="l">${esc(e.venue || '')}</td><td class="l">${esc(e.moveIn || '')}</td><td>${fmt(e.hh)}</td><td>${fmt(e.target)}</td><td><b>${fmt(e.amt)}</b></td><td>${fmt(e.cnt)}</td><td><span class="rate ${rateCls(e._rate)}">${e._rate != null ? fmt(e._rate) + '%' : ''}</span></td><td>${fmt(e.unit, 1)}</td><td>${fmt(e.closeAmt)}</td><td>${fmt(e.dvmCnt)}</td><td>${fmt(e.dvmAmt)}</td></tr>`).join('');
   }).join('');
   return `<div class="pagehead"><div><h2>박람회 실적</h2><p>${S.year === 'all' ? '전체' : S.year + '년'} · 완료 ${tot.n}건 · 판매 ${fmt(tot.amt)} / 목표 ${fmt(tot.target)} (${fmt(tot.rate)}%) · 단위 백만원</p></div>
-    <div class="toolbar">${yearChips(true)}<input id="q" class="search" placeholder="단지명 · 주관사 · 장소 검색" value="${esc(S.q)}">${S.edit ? '<button class="btn pri" id="newEv">+ 박람회 추가</button>' : ''}</div></div>
+    <div class="toolbar">${yearChips(true)}<input id="q" class="search" placeholder="단지명 · 주관사 · 장소 검색" value="${esc(S.q)}">${savePill()}${S.edit ? '<button class="btn pri" id="newEv">+ 박람회 추가</button>' : ''}</div></div>
   <div class="tblwrap"><table class="tbl num"><thead><tr><th class="l">일정</th><th class="l">주차</th><th class="l">단지 / 박람회</th><th class="l">주관사</th><th class="l">장소</th><th class="l">입주</th><th>세대</th><th>목표</th><th>판매금액</th><th>건수</th><th>달성률</th><th>객단가</th><th>실판매마감</th><th>DVM건</th><th>DVM</th></tr></thead><tbody>${body || '<tr><td colspan="15" class="l empty">검색 결과가 없습니다</td></tr>'}</tbody></table></div>`;
 }
 
@@ -535,7 +583,7 @@ function vPlan() {
   const soon = DB.apts.filter(a => a.y === ny && !a._ev.length && a.m <= 4 && a._st === '미착수').sort((a, b) => a.m - b.m || b.hh - a.hh);
   const stTag = (e) => e._st === 'wait' ? '<span class="tag t-red">실적 입력 대기</span>' : `<span class="tag t-blue">예정</span>${e.tag === '미확정' ? '<span class="tag t-warn">미확정</span>' : ''}`;
   const dday = (e) => { const d = Math.round((e._s - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5); return d > 0 ? `D-${d}` : d === 0 ? 'D-day' : `${-d}일 지남`; };
-  const head = pc ? `<div class="pagehead"><div><h2>일정</h2><p>실적 입력 대기 ${plan.filter(e => e._st === 'wait').length}건 · 예정 ${plan.filter(e => e._st === 'plan').length}건${S.edit ? ' · 줄을 눌러 실적 입력' : ''}</p></div>${S.edit ? '<button class="btn pri" id="newEv">+ 박람회 추가</button>' : ''}</div>` : '';
+  const head = pc ? `<div class="pagehead"><div><h2>일정</h2><p>실적 입력 대기 ${plan.filter(e => e._st === 'wait').length}건 · 예정 ${plan.filter(e => e._st === 'plan').length}건${S.edit ? ' · 줄을 눌러 실적 입력' : ''}</p></div>${savePill()}${S.edit ? '<button class="btn pri" id="newEv">+ 박람회 추가</button>' : ''}</div>` : '';
   const g = groupByMonth(plan);
   let evBody;
   if (pc) {
@@ -616,7 +664,7 @@ function vAptPC() {
   const hostOf = (a) => esc(a._plan?.host || a.mg.host || a._ev[0]?.host || '');
   const tr = rows.map(a => `<tr class="click ${S.dirty.has(a.id) ? 'dirty' : ''}" data-apt="${a.id}"><td>${a.m ? a.m + '월' : '–'}</td><td class="l"><b>${esc(a.name)}</b>${a.flag ? ' <span class="tag t-warn">시트</span>' : ''}</td><td class="l">${esc(sidoS(a.sido))} ${esc(a.sigungu)} ${esc(a.dong)}</td><td class="l">${esc(a.type)}</td><td>${fmt(a.hh)}</td><td class="l"><span class="tag ${ST_CLS[a._st]}">${a._st}</span></td><td class="l">${fairOf(a)}</td><td>${a._agg.amt ? fmt(a._agg.amt) : ''}</td><td>${a._agg.rate != null ? `<span class="rate ${rateCls(a._agg.rate)}">${fmt(a._agg.rate)}%</span>` : ''}</td><td class="l">${hostOf(a)}</td><td class="l">${esc(a.mg.invite || '')}</td><td class="l">${esc((a.mg.stores || '').slice(0, 24))}</td><td class="l" style="max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(a.mg.memo || '')}</td></tr>`).join('');
   return `<div class="pagehead"><div><h2>입주단지 관리</h2><p>입주 예정 단지별 박람회·고객초청·배정점 관리${S.edit ? ' · 행을 클릭해 수정' : ''}</p></div>
-    <div class="toolbar"><input id="aq" class="search" placeholder="단지명 · 지역 검색" value="${esc(S.aptQ)}">${S.edit ? '<button class="btn pri" id="newApt">+ 단지 추가</button>' : ''}</div></div>
+    <div class="toolbar"><input id="aq" class="search" placeholder="단지명 · 지역 검색" value="${esc(S.aptQ)}">${savePill()}${S.edit ? '<button class="btn pri" id="newApt">+ 단지 추가</button>' : ''}</div></div>
   <div class="grid2" style="grid-template-columns:1fr 1.4fr;margin-bottom:12px"><div class="kpis" style="grid-template-columns:1fr">${aptSummary(rows)}</div><div>${monthGrid(base)}</div></div>
   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">${aptFilters().replace(/<div class="chips">/g, '<div class="chips" style="flex-wrap:wrap">')}</div>
   <div class="tblwrap"><table class="tbl num"><thead><tr><th>입주</th><th class="l">단지명</th><th class="l">지역</th><th class="l">유형</th><th>세대</th><th class="l">상태</th><th class="l">박람회</th><th>판매</th><th>달성률</th><th class="l">주관사</th><th class="l">고객초청</th><th class="l">배정점</th><th class="l">메모</th></tr></thead><tbody>${tr || '<tr><td colspan="13" class="l empty">해당 단지가 없습니다</td></tr>'}</tbody></table></div>`;
@@ -665,6 +713,8 @@ function openEvent(id) {
   openSheet(`<h3>${esc(e.name)}</h3><div>${evTags(e)}</div>
     <div class="kv">${kv.map(([k, v]) => `<div>${k}</div><div class="num">${v}</div>`).join('')}</div>
     ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+    ${e.shops && e.shops.length ? (() => { const sorted = e.shops.slice().sort((a, b) => (b.a || 0) - (a.a || 0)); const tc = sorted.reduce((t, x) => t + (x.c || 0), 0), ta = sorted.reduce((t, x) => t + (x.a || 0), 0);
+      return `<h2 class="sec">매장별 실적 <small>${sorted.length}개 매장 · ${fmt(tc)}건 · ${fmt(ta)} 백만원</small></h2><div class="tblwrap" style="max-height:none"><table class="tbl num"><thead><tr><th class="l">매장</th><th></th><th>건수</th><th>금액</th><th>객단가</th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(sorted, ta)}</tbody></table></div>${e.shopNote ? `<div class="note">${esc(e.shopNote)}</div>` : ''}`; })() : (e._done && e.y >= 2026 ? '<div class="note">매장별 실적이 아직 없습니다. PC 편집 모드에서 입력할 수 있습니다.</div>' : '')}
     ${apt ? `<h2 class="sec">입주단지 연결</h2>${aptCard(apt)}` : ''}`);
 }
 function editEvent(e, isNew) {
@@ -684,6 +734,8 @@ function editEvent(e, isNew) {
     ${F('closeAmt', '실판매 마감 실적 (부가세포함)', e.closeAmt, {num: 1})}${F('dvmCnt', 'DVM 건수', e.dvmCnt, {num: 1})}${F('dvmAmt', 'DVM 실적', e.dvmAmt, {num: 1})}
     <div class="grp">참여 매장</div>
     ${F('stType', '상권구분', st.type || '', {w: 1, sel: ['', '당사', 'SDP']})}${F('stDp', 'DP (쉼표로 구분)', (st.dp || []).join(', '), {w: 3})}${F('stDept', '백화점 (쉼표)', (st.dept || []).join(', '))}
+    <div class="grp">매장별 실적 <span style="font:400 12.5px var(--mono);color:var(--mute)">한 줄에 「매장 건수 금액」 · 예: 청주 13 146</span></div>
+    ${F('shops', '매장별 (지점별실적 시트)', (e.shops || []).map(x => `${x.s} ${x.c ?? ''} ${x.a ?? ''}`.trim()).join('\n'), {w: 6, area: 1})}
     ${F('note', '메모', e.note, {w: 6, area: 1})}
   </form>
   <div class="formbar">${isNew ? '<span></span>' : '<button class="btn danger" id="delEv">삭제</button>'}<div style="display:flex;gap:8px"><button class="btn" id="cancel">취소</button><button class="btn pri" id="apply">적용</button></div></div>`);
@@ -693,9 +745,11 @@ function editEvent(e, isNew) {
     const fd = Object.fromEntries(new FormData($('#ef')));
     if (!fd.name.trim()) return toast('단지 / 박람회명을 입력하세요');
     const nums = ['y', 'm', 'days', 'cha', 'hh', 'target', 'amt', 'cnt', 'unit', 'pay', 'closeCnt', 'closeAmt', 'dvmCnt', 'dvmAmt'];
-    for (const [k, v] of Object.entries(fd)) { if (k.startsWith('st')) continue; const val = nums.includes(k) ? numOrNull(v) : (v.trim() || null); if (val == null) delete e[k]; else e[k] = val; }
+    for (const [k, v] of Object.entries(fd)) { if (k.startsWith('st') || k === 'shops') continue; const val = nums.includes(k) ? numOrNull(v) : (v.trim() || null); if (val == null) delete e[k]; else e[k] = val; }
     if (e.unit == null && e.amt != null && e.cnt) e.unit = Math.round(e.amt / e.cnt * 10) / 10;
-    const s = { type: fd.stType || '', dp: listOf(fd.stDp), dept: listOf(fd.stDept) };
+    const sh = String(fd.shops || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^(.*?)\s+([\d.,]+|-)?\s*([\d.,]+|-)?$/); return m ? { s: m[1].trim(), c: numOrNull(m[2]), a: numOrNull(m[3]) } : { s: l, c: null, a: null }; });
+    if (sh.length) e.shops = sh; else delete e.shops;
+    delete e.shops_; const s = { type: fd.stType || '', dp: listOf(fd.stDp), dept: listOf(fd.stDept) };
     if (s.type || s.dp.length || s.dept.length) e.stores = s; else delete e.stores;
     e.cha = e.cha || 1;
     if (isNew) DB.events.push(e);
@@ -775,21 +829,22 @@ function ghSettings() {
     <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--navy);font-weight:700">열쇠 만들기 페이지 열기 ›</a> (GitHub 로그인 상태에서)</li>
     <li><b>Token name</b>: 아무 이름 (예: 입주박람회) · <b>Expiration</b>: 원하는 기간 (최대 1년)</li>
     <li><b>Repository access</b> → <b>Only select repositories</b> → <b>${esc(r.repo || 'ipju-fair')}</b> 하나만 선택</li>
-    <li><b>Permissions</b> → <b>Contents</b> 를 <b>Read and write</b> 로 바꾸기 (다른 것은 그대로)</li>
+    <li><b>Permissions</b> → <b>+ Add permissions</b> → 검색칸에 <b>contents</b> → <b>Contents</b> 체크 → 바깥 클릭</li>
+    <li>생긴 <b>Contents</b> 줄 오른쪽을 <b>Read-only</b> → <b>Read and write</b> 로 바꾸기 (Metadata는 그대로)</li>
     <li>맨 아래 <b>Generate token</b> → 나온 <span class="mono">github_pat_…</span> 글자를 복사해 아래 칸에 붙여넣기</li>
   </ol>
   <div class="note" style="white-space:normal">열쇠는 이 PC 브라우저에만 보관되고 GitHub 파일에는 들어가지 않습니다. 이 저장소 하나에만 쓰기 권한이 있어 다른 저장소는 건드릴 수 없습니다. 휴대폰은 보기 전용이라 넣지 않아도 됩니다.</div>
   <form class="form" id="gf">${F('token', '열쇠 (토큰)', r.token, {w: 6, ph: 'github_pat_...'})}<details class="f w6" style="font-size:13px;color:var(--sub)"><summary style="cursor:pointer">저장소 정보 (보통 자동으로 채워짐)</summary><div class="form" style="margin-top:8px">${F('owner', 'GitHub 계정', r.owner || 'pegasus0710-arch', {w: 3})}${F('repo', '저장소', r.repo || 'ipju-fair', {w: 3})}</div></details></form>
   <div class="formbar"><button class="btn danger" id="gClear">열쇠 지우기</button><div style="display:flex;gap:8px"><button class="btn" id="cancel">닫기</button><button class="btn pri" id="gSave">켜기</button></div></div>`);
   $('#cancel').onclick = closeSheet;
-  $('#gClear').onclick = () => { ls(TKEY, null); closeSheet(); toast('열쇠를 지웠습니다 · 자동 저장 꺼짐'); };
-  $('#gSave').onclick = () => { const fd = Object.fromEntries(new FormData($('#gf'))); ls(TKEY, JSON.stringify({ owner: fd.owner.trim(), repo: fd.repo.trim(), token: fd.token.trim() })); closeSheet(); render();
+  $('#gClear').onclick = () => { ls(TKEY, null); closeSheet(); SAVE.err = null; render(); toast('열쇠를 지웠습니다 · 자동 저장 꺼짐'); };
+  $('#gSave').onclick = () => { const fd = Object.fromEntries(new FormData($('#gf'))); ls(TKEY, JSON.stringify({ owner: fd.owner.trim(), repo: fd.repo.trim(), token: fd.token.trim() })); SAVE.err = null; closeSheet(); render();
     if (S.dirty.size) saveGitHub(); else toast('자동 저장을 켰습니다 · 이제 「적용」만 누르면 저장됩니다'); };
 }
 async function saveGitHub() {
   const r = repoInfo();
   if (!r.token || !r.owner || !r.repo) return ghSettings();
-  const btn = $('#saveGh'); if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+  SAVE.busy = true; SAVE.err = null; renderTabs();
   try {
     const api = `https://api.github.com/repos/${r.owner}/${r.repo}/contents/data.enc.json`;
     const H = { Authorization: `Bearer ${r.token}`, Accept: 'application/vnd.github+json' };
@@ -800,9 +855,15 @@ async function saveGitHub() {
     const res = await fetch(api, { method: 'PUT', headers: { ...H, 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: `데이터 수정 (${S.dirty.size}건)`, content: btoa(unescape(encodeURIComponent(content))), sha, branch: 'main' }) });
     if (!res.ok) throw new Error('저장 실패 (' + res.status + ')');
-    DB.meta.updated = cleanDB().meta.updated; S.dirty.clear(); prep(); render();
+    DB.meta.updated = cleanDB().meta.updated; S.dirty.clear();
+    const t = new Date(); SAVE = { busy: false, err: null, last: `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` };
+    prep(); render();
     toast('GitHub에 저장했습니다 · 1~2분 뒤 모든 기기에 반영');
-  } catch (err) { toast(err.message + (/40[13]/.test(err.message) ? ' · 열쇠가 틀렸거나 기간이 끝났습니다' : ' · 잠시 뒤 「다시 저장」을 눌러 주세요')); if (btn) { btn.disabled = false; btn.textContent = 'GitHub에 저장'; } }
+  } catch (err) {
+    const bad = /40[134]/.test(err.message);
+    SAVE = { busy: false, last: SAVE.last, err: bad ? '열쇠가 틀렸거나 기간 만료' : '연결 실패 · 다시 저장' };
+    toast(err.message + (bad ? ' · 열쇠가 틀렸거나 기간이 끝났습니다' : ' · 잠시 뒤 「다시 저장」을 눌러 주세요')); render();
+  }
 }
 async function saveFile() {
   const content = await encrypt(cleanDB());
