@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#ece6da">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="입주박람회">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>충청 입주박람회 관리</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2.0.5/fonts/variable/woff2/SUIT-Variable.css">
@@ -296,12 +303,28 @@ body.pc .toolbar .search{width:280px;margin:0;height:44px}
 .ctip.on{opacity:1}
 .ctip b{color:#ffd29c}
 .tbl th small.u{display:block;font:400 11px var(--mono);color:var(--mute);margin-top:1px}
+/* 설치 권유 */
+#inst{position:fixed;left:12px;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:65;display:none;align-items:center;gap:12px;background:var(--raise);border-radius:16px;padding:12px 12px 12px 14px;box-shadow:var(--sh-pop);border:2px solid var(--navy);max-width:460px;margin:0 auto}
+#inst.on{display:flex}
+#inst img{flex:0 0 44px;width:44px;height:44px;border-radius:11px}
+#inst .tx{flex:1;min-width:0}
+#inst .tx b{display:block;font-size:15px;letter-spacing:-.02em}
+#inst .tx small{display:block;font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.45}
+#inst .x{border:0;background:none;color:var(--mute);font-size:13px;cursor:pointer;padding:6px;white-space:nowrap}
+body.locked #inst,body.pc #inst{bottom:24px}
+@media (min-width:1024px){body.pc #inst{left:auto;right:24px;margin:0}}
+#ios{position:fixed;inset:0;z-index:80;display:none;background:rgba(60,50,35,.4);align-items:flex-end;justify-content:center}
+#ios.on{display:flex}
+#ios .box{background:var(--raise);border-radius:18px 18px 0 0;padding:22px 22px calc(24px + env(safe-area-inset-bottom));width:100%;max-width:480px;box-shadow:var(--sh-pop)}
+#ios h3{margin:0 0 12px;font:800 20px var(--head)}
+#ios ol{margin:0;padding-left:22px;line-height:1.9;font-size:15px}
+#ios .ic{display:inline-block;vertical-align:-4px;width:20px;height:20px;color:var(--navy)}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--raise);color:var(--ink);font-weight:700;padding:12px 18px;border-radius:12px;font-size:14px;z-index:70;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--sh-pop);border:2px solid var(--navy)}
 #toast.on{opacity:1}
 @media (min-width:1024px){body.pc #toast{bottom:28px}}
 </style>
 </head>
-<body>
+<body class="locked">
 
 <div id="lock">
   <form class="box" id="lockForm" autocomplete="on">
@@ -327,6 +350,22 @@ body.pc .toolbar .search{width:280px;margin:0;height:44px}
 </div>
 <div id="sheet"><div class="dim"></div><div class="pane" id="pane"></div></div>
 <div id="toast"></div>
+<div id="inst" role="dialog" aria-label="앱 설치">
+  <img src="icons/icon-192.png" alt="">
+  <div class="tx"><b>앱으로 설치하기</b><small id="instSub">홈 화면에서 바로 열고, 주소창 없이 앱처럼 씁니다</small></div>
+  <button class="x" id="instLater">나중에</button>
+  <button class="btn pri sm" id="instGo">설치</button>
+</div>
+<div id="ios"><div class="box">
+  <h3>홈 화면에 추가</h3>
+  <ol>
+    <li>Safari 아래(아이패드는 위) <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> <b>공유</b> 버튼</li>
+    <li>목록을 내려 <b>홈 화면에 추가</b></li>
+    <li>오른쪽 위 <b>추가</b></li>
+  </ol>
+  <div class="note" style="white-space:normal">카카오톡 등 앱 안에서 열었다면 오른쪽 위 메뉴의 <b>Safari로 열기</b>를 먼저 눌러 주세요.</div>
+  <button class="btn" style="width:100%;margin-top:14px;height:48px" id="iosClose">닫기</button>
+</div></div>
 
 <script>
 (() => {
@@ -345,6 +384,35 @@ const APT_ST = ['미착수', '협의중', '박람회확정', '진행완료', '�
 const ST_CLS = {'미착수': 't-gray', '협의중': 't-warn', '박람회확정': 't-blue', '진행완료': 't-green', '보류': 't-red'};
 const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } };
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
+
+/* ---------- 앱 설치 ---------- */
+const IKEY = 'ipju_fair_inst';
+const standalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let deferredPrompt = null;
+function instState() { try { return JSON.parse(localStorage.getItem(IKEY) || '{}'); } catch (e) { return {}; } }
+function instSave(o) { try { localStorage.setItem(IKEY, JSON.stringify({ ...instState(), ...o })); } catch (e) {} }
+function showInstall() {
+  const st = instState();
+  if (standalone() || st.installed) { $('#inst').classList.remove('on'); return; }
+  if (st.later && Date.now() - st.later < 7 * 864e5) return;
+  if (!deferredPrompt && !isIOS) return;           // 설치를 지원하지 않는 브라우저
+  $('#instSub').textContent = isIOS ? '공유 → 홈 화면에 추가로 앱처럼 씁니다' : (isPC() ? '바탕화면·작업표시줄에서 바로 엽니다' : '홈 화면에서 바로 열고, 주소창 없이 씁니다');
+  $('#inst').classList.add('on');
+}
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; showInstall(); });
+window.addEventListener('appinstalled', () => { instSave({ installed: 1 }); $('#inst').classList.remove('on'); toast('설치했습니다 · 홈 화면에서 열어 주세요'); });
+$('#instLater').onclick = () => { instSave({ later: Date.now() }); $('#inst').classList.remove('on'); };
+$('#instGo').onclick = async () => {
+  if (isIOS) { $('#ios').classList.add('on'); return; }
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt(); const r = await deferredPrompt.userChoice; deferredPrompt = null;
+  $('#inst').classList.remove('on'); if (r.outcome === 'accepted') instSave({ installed: 1 });
+};
+$('#iosClose').onclick = () => $('#ios').classList.remove('on');
+if (standalone()) instSave({ installed: 1 });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+setTimeout(showInstall, 1200);
 
 /* ---------- crypto ---------- */
 const ub64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -368,7 +436,7 @@ async function encrypt(obj) {
 async function unlock(pw, keep) {
   DB = await decrypt(pw); PW = pw;
   if (keep) ls(KEY, pw);
-  prep(); $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden'); render();
+  prep(); document.body.classList.remove('locked'); $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden'); render();
 }
 $('#lockForm').addEventListener('submit', async (e) => {
   e.preventDefault(); $('#err').textContent = '확인 중…';
