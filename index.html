@@ -388,8 +388,8 @@ function renderTabs() {
     + (pc ? `<div class="sidebox side-only">
         <div class="switch ${S.edit ? 'on' : ''}" id="editSw"><span>편집 모드</span><i></i></div>
         ${S.edit ? `<div style="margin:8px 2px 0;line-height:1.5">행을 클릭하면 오른쪽에서 수정합니다.</div>` : ''}
-        ${S.dirty.size ? `<div class="savebox"><b>저장 안 된 변경 ${S.dirty.size}건</b><div style="display:flex;gap:6px;margin-top:8px"><button class="btn blue sm" id="saveGh">GitHub에 저장</button><button class="btn sm" id="saveFile">파일 받기</button></div></div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:12px"><button class="btn sm" id="ghSet">저장 설정</button><button class="btn sm" id="lockBtn">잠금</button></div>
+        ${S.dirty.size ? `<div class="savebox"><b>${repoInfo().token ? '저장 중이거나 실패한 변경' : '저장 안 된 변경'} ${S.dirty.size}건</b><div style="display:flex;gap:6px;margin-top:8px"><button class="btn blue sm" id="saveGh">${repoInfo().token ? '다시 저장' : 'GitHub에 저장'}</button><button class="btn sm" id="saveFile">파일 받기</button></div></div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:12px"><button class="btn sm" id="ghSet">${repoInfo().token ? '자동 저장 켜짐' : '자동 저장 켜기'}</button><button class="btn sm" id="lockBtn">잠금</button></div>
       </div>` : '');
   $$('#tabs button[data-t]').forEach(b => b.onclick = () => { S.tab = b.dataset.t; render(); scrollTo(0, 0); });
   const sw = $('#editSw'); if (sw) sw.onclick = () => { S.edit = !S.edit; render(); };
@@ -717,7 +717,13 @@ function editApt(a, isNew) {
     S.dirty.add(a.id); afterEdit(isNew ? '추가했습니다' : '적용했습니다');
   };
 }
-function afterEdit(msg) { closeSheet(); prep(); render(); toast(msg + ' · 왼쪽에서 저장하세요'); }
+let saveTimer = null;
+function afterEdit(msg) {
+  closeSheet(); prep(); render();
+  const r = repoInfo();
+  if (r.token && r.owner && r.repo) { toast(msg + ' · 자동 저장 중…'); clearTimeout(saveTimer); saveTimer = setTimeout(saveGitHub, 600); }
+  else toast(msg + ' · 왼쪽 「자동 저장 켜기」를 한 번 해 두면 바로 저장됩니다');
+}
 
 /* ---------- 저장 ---------- */
 function cleanDB() {
@@ -733,13 +739,22 @@ function repoInfo() {
 }
 function ghSettings() {
   const r = repoInfo();
-  openSheet(`<h3>저장 설정 (이 PC에만 저장)</h3>
-  <div class="note" style="margin-top:8px">편집한 내용을 GitHub에 바로 저장하려면 이 저장소에만 쓰기 권한이 있는 토큰이 필요합니다.<br>GitHub → Settings → Developer settings → Fine-grained tokens → 저장소 1개 선택 → Contents: Read and write.<br>토큰은 이 PC 브라우저에만 저장되고 데이터 파일에는 들어가지 않습니다.</div>
-  <form class="form" id="gf">${F('owner', 'GitHub 계정', r.owner, {w: 3})}${F('repo', '저장소', r.repo, {w: 3})}${F('token', '토큰', r.token, {w: 6, ph: 'github_pat_...'})}</form>
-  <div class="formbar"><button class="btn danger" id="gClear">토큰 지우기</button><div style="display:flex;gap:8px"><button class="btn" id="cancel">닫기</button><button class="btn pri" id="gSave">저장</button></div></div>`);
+  openSheet(`<h3>자동 저장 켜기 <small style="font:400 12.5px var(--mono);color:var(--mute)">이 PC에서 한 번만</small></h3>
+  <div class="note" style="margin-top:8px;white-space:normal">이 화면은 GitHub에 올려 둔 파일이라, 고친 내용을 다시 GitHub에 써 넣으려면 <b>GitHub가 발급하는 열쇠(토큰)</b>가 한 번 필요합니다. 열쇠를 넣어 두면 그다음부터는 <b>「적용」만 누르면 자동으로 저장</b>되고, 1~2분 뒤 휴대폰에도 보입니다.</div>
+  <ol style="margin:14px 0 0;padding-left:20px;line-height:1.75;font-size:14.5px">
+    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--navy);font-weight:700">열쇠 만들기 페이지 열기 ›</a> (GitHub 로그인 상태에서)</li>
+    <li><b>Token name</b>: 아무 이름 (예: 입주박람회) · <b>Expiration</b>: 원하는 기간 (최대 1년)</li>
+    <li><b>Repository access</b> → <b>Only select repositories</b> → <b>${esc(r.repo || 'ipju-fair')}</b> 하나만 선택</li>
+    <li><b>Permissions</b> → <b>Contents</b> 를 <b>Read and write</b> 로 바꾸기 (다른 것은 그대로)</li>
+    <li>맨 아래 <b>Generate token</b> → 나온 <span class="mono">github_pat_…</span> 글자를 복사해 아래 칸에 붙여넣기</li>
+  </ol>
+  <div class="note" style="white-space:normal">열쇠는 이 PC 브라우저에만 보관되고 GitHub 파일에는 들어가지 않습니다. 이 저장소 하나에만 쓰기 권한이 있어 다른 저장소는 건드릴 수 없습니다. 휴대폰은 보기 전용이라 넣지 않아도 됩니다.</div>
+  <form class="form" id="gf">${F('token', '열쇠 (토큰)', r.token, {w: 6, ph: 'github_pat_...'})}<details class="f w6" style="font-size:13px;color:var(--sub)"><summary style="cursor:pointer">저장소 정보 (보통 자동으로 채워짐)</summary><div class="form" style="margin-top:8px">${F('owner', 'GitHub 계정', r.owner || 'pegasus0710-arch', {w: 3})}${F('repo', '저장소', r.repo || 'ipju-fair', {w: 3})}</div></details></form>
+  <div class="formbar"><button class="btn danger" id="gClear">열쇠 지우기</button><div style="display:flex;gap:8px"><button class="btn" id="cancel">닫기</button><button class="btn pri" id="gSave">켜기</button></div></div>`);
   $('#cancel').onclick = closeSheet;
-  $('#gClear').onclick = () => { ls(TKEY, null); closeSheet(); toast('토큰을 지웠습니다'); };
-  $('#gSave').onclick = () => { const fd = Object.fromEntries(new FormData($('#gf'))); ls(TKEY, JSON.stringify({ owner: fd.owner.trim(), repo: fd.repo.trim(), token: fd.token.trim() })); closeSheet(); toast('저장 설정을 기억했습니다'); render(); };
+  $('#gClear').onclick = () => { ls(TKEY, null); closeSheet(); toast('열쇠를 지웠습니다 · 자동 저장 꺼짐'); };
+  $('#gSave').onclick = () => { const fd = Object.fromEntries(new FormData($('#gf'))); ls(TKEY, JSON.stringify({ owner: fd.owner.trim(), repo: fd.repo.trim(), token: fd.token.trim() })); closeSheet(); render();
+    if (S.dirty.size) saveGitHub(); else toast('자동 저장을 켰습니다 · 이제 「적용」만 누르면 저장됩니다'); };
 }
 async function saveGitHub() {
   const r = repoInfo();
@@ -757,7 +772,7 @@ async function saveGitHub() {
     if (!res.ok) throw new Error('저장 실패 (' + res.status + ')');
     DB.meta.updated = cleanDB().meta.updated; S.dirty.clear(); prep(); render();
     toast('GitHub에 저장했습니다 · 1~2분 뒤 모든 기기에 반영');
-  } catch (err) { toast(err.message + ' · 설정을 확인하세요'); if (btn) { btn.disabled = false; btn.textContent = 'GitHub에 저장'; } }
+  } catch (err) { toast(err.message + (/40[13]/.test(err.message) ? ' · 열쇠가 틀렸거나 기간이 끝났습니다' : ' · 잠시 뒤 「다시 저장」을 눌러 주세요')); if (btn) { btn.disabled = false; btn.textContent = 'GitHub에 저장'; } }
 }
 async function saveFile() {
   const content = await encrypt(cleanDB());
