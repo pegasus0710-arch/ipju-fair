@@ -145,7 +145,8 @@ body.pc .toolbar .search{width:280px;margin:0;height:44px}
 .mchart .tg{position:absolute;left:0;right:0;bottom:0;border:1.5px dashed var(--crop);border-bottom:0;border-radius:4px 4px 0 0}
 .mchart .am{position:relative;width:100%;background:#7c7a8a;border-radius:4px 4px 0 0}
 .mchart .am.over{background:var(--navy)}
-.mchart .lb{font:400 12.5px var(--mono);color:var(--mute);margin-top:4px}
+.mchart .lb{font:400 12.5px var(--mono);color:var(--mute);margin-top:4px;white-space:nowrap;letter-spacing:-.06em}
+@media (max-width:699px){.mchart .lb{font-size:11px}}
 .legend{display:flex;gap:14px;font-size:12.5px;color:var(--sub);margin-top:10px;flex-wrap:wrap}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -285,6 +286,16 @@ body.pc .toolbar .search{width:280px;margin:0;height:44px}
 .sbar{height:8px;border-radius:99px;background:var(--sink);overflow:hidden;min-width:60px}
 .sbar i{display:block;height:100%;background:var(--navy);border-radius:99px}
 .sbar i.d{background:var(--brown)}
+.mchart{height:180px!important}
+.mchart .stack{height:130px!important}
+.mchart .col{cursor:pointer;position:relative;border-radius:8px;outline:none}
+.mchart .col:hover,.mchart .col:focus,.mchart .col.on{background:rgba(32,38,58,.07)}
+.mchart .vl{position:absolute;left:50%;transform:translateX(-50%);font:700 11.5px var(--mono);color:var(--ink);white-space:nowrap;letter-spacing:-.04em}
+@media (max-width:699px){.mchart .vl{font-size:10px;letter-spacing:-.08em}}
+.ctip{position:absolute;z-index:5;pointer-events:none;background:var(--navy);color:#fff;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .12s}
+.ctip.on{opacity:1}
+.ctip b{color:#ffd29c}
+.tbl th small.u{display:block;font:400 11px var(--mono);color:var(--mute);margin-top:1px}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--raise);color:var(--ink);font-weight:700;padding:12px 18px;border-radius:12px;font-size:14px;z-index:70;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--sh-pop);border:2px solid var(--navy)}
 #toast.on{opacity:1}
 @media (min-width:1024px){body.pc #toast{bottom:28px}}
@@ -469,6 +480,16 @@ function bind(v) {
   $$('[data-ast]', v).forEach(b => b.onclick = () => { S.aptSt = b.dataset.ast; render(); });
   $$('[data-goto]', v).forEach(b => b.onclick = (e) => { e.preventDefault(); S.tab = b.dataset.goto; render(); scrollTo(0, 0); });
   $$('[data-ghset]', v).forEach(b => b.onclick = ghSettings);
+  const mc = $('#mchart', v), tip = $('#ctip', v);
+  if (mc && tip) {
+    const show = (col) => { $$('.col.on', mc).forEach(x => x.classList.remove('on')); col.classList.add('on'); tip.innerHTML = col.dataset.tip; tip.classList.add('on');
+      const card = mc.parentElement.getBoundingClientRect(), c = col.getBoundingClientRect();
+      let x = c.left - card.left + c.width / 2 - tip.offsetWidth / 2; x = Math.max(8, Math.min(x, card.width - tip.offsetWidth - 8));
+      tip.style.left = x + 'px'; tip.style.top = Math.max(4, c.top - card.top - tip.offsetHeight + 30) + 'px'; };
+    const hide = () => { tip.classList.remove('on'); $$('.col.on', mc).forEach(x => x.classList.remove('on')); };
+    $$('.col', mc).forEach(col => { col.onmouseenter = () => { if (!matchMedia('(pointer:coarse)').matches) show(col); };  col.onclick = (e) => { e.stopPropagation(); col.classList.contains('on') && tip.classList.contains('on') && matchMedia('(pointer:coarse)').matches ? hide() : show(col); }; });
+    mc.onmouseleave = () => { if (!matchMedia('(pointer:coarse)').matches) hide(); }; document.addEventListener('click', hide, { once: true });
+  }
   const nb = $('#newEv', v); if (nb) nb.onclick = () => openEvent(null);
   const na = $('#newApt', v); if (na) na.onclick = () => openApt(null);
   for (const [id, k] of [['q', 'q'], ['aq', 'aptQ']]) {
@@ -487,7 +508,9 @@ function vHome() {
   const maxV = Math.max(1, ...Array.from({length: 12}, (_, i) => { const r = agg(done.filter(e => e.m === i + 1)); return Math.max(r.amt, r.target); }));
   const chart = Array.from({length: 12}, (_, i) => {
     const r = agg(done.filter(e => e.m === i + 1));
-    return `<div class="col" title="${i + 1}월 목표 ${fmt(r.target)} / 판매 ${fmt(r.amt)}"><div class="stack">${r.target ? `<div class="tg" style="height:${r.target / maxV * 120}px"></div>` : ''}<div class="am ${r.amt >= r.target && r.amt ? 'over' : ''}" style="height:${r.amt / maxV * 120}px"></div></div><div class="lb">${i + 1}</div></div>`;
+    const tip = r.n || r.amt ? `<b>${S.year}년 ${i + 1}월</b> · 박람회 ${r.n}건<br>판매 <b>${fmt(r.amt)}</b> 백만원 (${fmt(r.cnt)}건)<br>목표 ${fmt(r.target)} 백만원${r.rate != null ? ` · 달성 <b>${fmt(r.rate)}%</b>` : ''}<br>객단가 ${fmt(r.unit, 1)} 백만원 · DVM ${fmt(r.dvmAmt)} 백만원` : `<b>${S.year}년 ${i + 1}월</b><br>실적 없음`;
+    const top = Math.max(r.amt, r.target) / maxV * 120;
+    return `<div class="col" data-tip="${esc(tip)}" tabindex="0"><div class="stack">${r.amt ? `<span class="vl num" style="bottom:${top + 3}px">${fmt(r.amt)}</span>` : ''}${r.target ? `<div class="tg" style="height:${r.target / maxV * 120}px"></div>` : ''}<div class="am ${r.amt >= r.target && r.amt ? 'over' : ''}" style="height:${r.amt / maxV * 120}px"></div></div><div class="lb">${i + 1}월</div></div>`;
   }).join('');
   const upcoming = DB.events.filter(e => e._st !== 'done').sort((x, y) => x._s - y._s).slice(0, pc ? 6 : 4);
   const cmp = years().map(y => { const r = agg(DB.events.filter(e => e.y === y && e._done)); return `<tr><td class="l"><b>${String(y).slice(2)}년</b></td><td>${fmt(r.n)}</td><td>${fmt(r.hh)}</td><td>${fmt(r.target)}</td><td>${fmt(r.amt)}</td><td><span class="rate ${rateCls(r.rate)}">${fmt(r.rate)}%</span></td><td>${fmt(r.unit, 1)}</td><td>${fmt(r.dvmAmt)}</td></tr>`; }).join('');
@@ -512,20 +535,20 @@ function vHome() {
   </div>
   <div class="grid2">
     <div><h2 class="sec">월별 판매 vs 목표 <small>백만원</small></h2>
-      <div class="card"><div class="mchart">${chart}</div>
-      <div class="legend"><span><i style="background:#7c7a8a"></i>판매금액</span><span><i style="background:var(--navy)"></i>목표 달성</span><span><i style="border:1.5px dashed var(--crop)"></i>목표</span></div></div></div>
+      <div class="card" style="position:relative"><div class="mchart" id="mchart">${chart}</div><div id="ctip" class="ctip"></div>
+      <div class="legend"><span><i style="background:#7c7a8a"></i>판매금액 (백만원)</span><span><i style="background:var(--navy)"></i>목표 달성</span><span><i style="border:1.5px dashed var(--crop)"></i>목표</span></div></div></div>
     <div><h2 class="sec">다가오는 일정 <small><a href="#" data-goto="plan" >전체 보기 ›</a></small></h2>${upHtml}</div>
   </div>
   <div class="grid2">
     <div><h2 class="sec">연도별 비교 <small>실적 있는 박람회만</small></h2>
-      <div class="card scrollx" style="padding:4px 6px"><table class="tbl num"><thead><tr><th class="l">연도</th><th>건수</th><th>세대</th><th>목표</th><th>판매</th><th>달성률</th><th>객단가</th><th>DVM</th></tr></thead><tbody>${cmp}</tbody></table></div></div>
+      <div class="card scrollx" style="padding:4px 6px"><table class="tbl num"><thead><tr><th class="l">연도</th><th>건수</th><th>세대</th><th>목표<small class="u">백만</small></th><th>판매<small class="u">백만</small></th><th>달성률</th><th>객단가<small class="u">백만</small></th><th>DVM<small class="u">백만</small></th></tr></thead><tbody>${cmp}</tbody></table></div></div>
     <div>${hostRows ? `<h2 class="sec">주관사별 성과 (${S.year}년) <small>세대당 = 판매 ÷ 세대 (만원)</small></h2>
-      <div class="card scrollx" style="padding:4px 6px"><table class="tbl num"><thead><tr><th class="l">주관사</th><th>건수</th><th>세대</th><th>판매</th><th>달성률</th><th>세대당</th></tr></thead><tbody>${hostRows}</tbody></table></div>` : ''}</div>
+      <div class="card scrollx" style="padding:4px 6px"><table class="tbl num"><thead><tr><th class="l">주관사</th><th>건수</th><th>세대</th><th>판매<small class="u">백만</small></th><th>달성률</th><th>세대당</th></tr></thead><tbody>${hostRows}</tbody></table></div>` : ''}</div>
   </div>
   ${(() => { const agg2 = {}; let ta = 0; DB.events.filter(e => e.y === S.year && e.shops).forEach(e => e.shops.forEach(x => { const r = agg2[x.s] = agg2[x.s] || { s: x.s, n: 0, c: 0, a: 0 }; r.n++; r.c += x.c || 0; r.a += x.a || 0; ta += x.a || 0; }));
     const list = Object.values(agg2).sort((a, b) => b.a - a.a); if (!list.length) return '';
     const nEv = DB.events.filter(e => e.y === S.year && e.shops).length;
-    return `<h2 class="sec">매장별 실적 (${S.year}년) <small>지점별실적 시트 · 박람회 ${nEv}건 기준</small></h2><div class="tblwrap" style="max-height:${document.body.classList.contains('pc') ? '520px' : 'none'}"><table class="tbl num"><thead><tr><th class="l">매장</th><th>박람회</th><th>건수</th><th>금액</th><th>객단가</th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(list, ta)}</tbody></table></div>`; })()}
+    return `<h2 class="sec">매장별 실적 (${S.year}년) <small>지점별실적 시트 · 박람회 ${nEv}건 기준</small></h2><div class="tblwrap" style="max-height:${document.body.classList.contains('pc') ? '520px' : 'none'}"><table class="tbl num"><thead><tr><th class="l">매장</th><th>박람회</th><th>건수</th><th>금액<small class="u">백만</small></th><th>객단가<small class="u">백만</small></th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(list, ta)}</tbody></table></div>`; })()}
   <div class="foot">· 합계는 각 박람회 행을 더해 계산합니다. 원본 시트의 월 합계 셀과 일부 다를 수 있습니다(예: 24년 2월 DVM, 25년 마감건수).<br>· 달성률 = 판매금액 ÷ 목표 (목표가 있는 박람회만).</div>`;
 }
 
@@ -544,7 +567,7 @@ function evCard(e) {
   return `<div class="ev" data-ev="${e.id}">
     <div class="r1"><div><div class="nm">${evTags(e)}${esc(e.name)}</div><div class="meta">${meta}</div></div>
     <div class="rate ${rateCls(r)}">${r != null ? fmt(r) + '%' : (e._done ? '' : '')}</div></div>
-    ${e._done || e.hh ? `<div class="nums num">${e.hh ? `<span>세대<b>${fmt(e.hh)}</b></span>` : ''}${e.target ? `<span>목표<b>${fmt(e.target)}</b></span>` : ''}${e.amt != null ? `<span>판매<b>${fmt(e.amt)}</b></span>` : ''}${e.cnt != null ? `<span>건수<b>${fmt(e.cnt)}</b></span>` : ''}${e.dvmAmt ? `<span>DVM<b>${fmt(e.dvmAmt)}</b></span>` : ''}</div>` : ''}
+    ${e._done || e.hh ? `<div class="nums num">${e.hh ? `<span>세대<b>${fmt(e.hh)}</b></span>` : ''}${e.target ? `<span>목표<b>${fmt(e.target)}</b> 백만</span>` : ''}${e.amt != null ? `<span>판매<b>${fmt(e.amt)}</b> 백만</span>` : ''}${e.cnt != null ? `<span>건수<b>${fmt(e.cnt)}</b></span>` : ''}${e.dvmAmt ? `<span>DVM<b>${fmt(e.dvmAmt)}</b> 백만</span>` : ''}</div>` : ''}
     ${r != null ? `<div class="pbar"><i style="width:${Math.min(100, r)}%;background:${rateColor(r)}"></i></div>` : ''}
   </div>`;
 }
@@ -557,7 +580,7 @@ function vList() {
   const rows = filteredEvents().sort((a, b) => b._s - a._s), g = groupByMonth(rows);
   const body = Object.keys(g).sort((a, b) => b - a).map(k => {
     const r = g[k], a = agg(r.filter(e => e._done));
-    return `<div class="mhead"><div>${String(Math.floor(k / 100)).slice(2)}년 ${k % 100}월</div><span class="num">${a.n}건 · 판매 ${fmt(a.amt)} / 목표 ${fmt(a.target)}${a.rate != null ? ` · ${fmt(a.rate)}%` : ''}</span></div><div class="list">${r.map(evCard).join('')}</div>`;
+    return `<div class="mhead"><div>${String(Math.floor(k / 100)).slice(2)}년 ${k % 100}월</div><span class="num">${a.n}건 · 판매 ${fmt(a.amt)} / 목표 ${fmt(a.target)} 백만원${a.rate != null ? ` · ${fmt(a.rate)}%` : ''}</span></div><div class="list">${r.map(evCard).join('')}</div>`;
   }).join('');
   return `${yearChips(true)}<input id="q" class="search" placeholder="단지명 · 주관사 · 장소 검색" value="${esc(S.q)}">${body || '<div class="empty">검색 결과가 없습니다</div>'}`;
 }
@@ -572,7 +595,7 @@ function vListPC() {
   }).join('');
   return `<div class="pagehead"><div><h2>박람회 실적</h2><p>${S.year === 'all' ? '전체' : S.year + '년'} · 완료 ${tot.n}건 · 판매 ${fmt(tot.amt)} / 목표 ${fmt(tot.target)} (${fmt(tot.rate)}%) · 단위 백만원</p></div>
     <div class="toolbar">${yearChips(true)}<input id="q" class="search" placeholder="단지명 · 주관사 · 장소 검색" value="${esc(S.q)}">${savePill()}${S.edit ? '<button class="btn pri" id="newEv">+ 박람회 추가</button>' : ''}</div></div>
-  <div class="tblwrap"><table class="tbl num"><thead><tr><th class="l">일정</th><th class="l">주차</th><th class="l">단지 / 박람회</th><th class="l">주관사</th><th class="l">장소</th><th class="l">입주</th><th>세대</th><th>목표</th><th>판매금액</th><th>건수</th><th>달성률</th><th>객단가</th><th>실판매마감</th><th>DVM건</th><th>DVM</th></tr></thead><tbody>${body || '<tr><td colspan="15" class="l empty">검색 결과가 없습니다</td></tr>'}</tbody></table></div>`;
+  <div class="tblwrap"><table class="tbl num"><thead><tr><th class="l">일정</th><th class="l">주차</th><th class="l">단지 / 박람회</th><th class="l">주관사</th><th class="l">장소</th><th class="l">입주</th><th>세대</th><th>목표<small class="u">백만</small></th><th>판매금액<small class="u">백만</small></th><th>건수</th><th>달성률</th><th>객단가<small class="u">백만</small></th><th>실판매마감<small class="u">백만</small></th><th>DVM건</th><th>DVM<small class="u">백만</small></th></tr></thead><tbody>${body || '<tr><td colspan="15" class="l empty">검색 결과가 없습니다</td></tr>'}</tbody></table></div>`;
 }
 
 /* ---------- 일정 ---------- */
@@ -616,7 +639,7 @@ function vPlan() {
 function aptStatus(a) {
   if (a._plan) return `<span class="tag t-blue">박람회 ${esc(a._plan.date)}</span>`;
   if (a.mg.status && a.mg.status !== '미착수') return `<span class="tag ${ST_CLS[a.mg.status]}">${esc(a.mg.status)}</span>${a.mg.fairDate ? `<span class="tag t-gray">${esc(a.mg.fairDate)}</span>` : ''}`;
-  if (a._ev.some(e => e._done)) { const g = a._agg; return `<span class="tag t-green">박람회 ${a._ev.filter(e => e._done).length}회</span>${g.amt ? `<span class="tag t-gray">판매 ${fmt(g.amt)}${g.rate != null ? ' · ' + fmt(g.rate) + '%' : ''}</span>` : ''}`; }
+  if (a._ev.some(e => e._done)) { const g = a._agg; return `<span class="tag t-green">박람회 ${a._ev.filter(e => e._done).length}회</span>${g.amt ? `<span class="tag t-gray">판매 ${fmt(g.amt)}백만${g.rate != null ? ' · ' + fmt(g.rate) + '%' : ''}</span>` : ''}`; }
   if (a._ev.length) return '<span class="tag t-green">진행 이력</span>';
   return a._recLabel ? `<span class="tag t-gray">박람회 권장 ${a._recLabel}</span>` : '';
 }
@@ -648,7 +671,7 @@ function aptSummary(rows) {
   const g = agg(rows.flatMap(a => a._ev.filter(e => e._done)));
   return `<div class="kpi hero"><div class="l">${S.aptYear}년 충청 입주${S.aptYear > TODAY.getFullYear() ? ' 예정' : ''} 단지${S.aptSido !== '전체' ? ' · ' + esc(sidoS(S.aptSido)) : ''}${S.aptMonth ? ' · ' + S.aptMonth + '월' : ''}</div>
       <div class="v num">${rows.length}<small>개 단지</small> <span style="font-size:18px;margin-left:6px">${fmt(tot)}<small>세대</small></span></div>
-      <div class="s">${byType}${bySt ? ' | ' + bySt : ''}${g.amt ? ` | 박람회 판매 ${fmt(g.amt)} / 목표 ${fmt(g.target)}${g.rate != null ? ` (${fmt(g.rate)}%)` : ''}` : ''}</div></div>`;
+      <div class="s">${byType}${bySt ? ' | ' + bySt : ''}${g.amt ? ` | 박람회 판매 ${fmt(g.amt)} / 목표 ${fmt(g.target)} 백만원${g.rate != null ? ` (${fmt(g.rate)}%)` : ''}` : ''}</div></div>`;
 }
 function vApt() {
   const base = aptBase(), rows = base.filter(a => !S.aptMonth || a.m === S.aptMonth);
@@ -667,7 +690,7 @@ function vAptPC() {
     <div class="toolbar"><input id="aq" class="search" placeholder="단지명 · 지역 검색" value="${esc(S.aptQ)}">${savePill()}${S.edit ? '<button class="btn pri" id="newApt">+ 단지 추가</button>' : ''}</div></div>
   <div class="grid2" style="grid-template-columns:1fr 1.4fr;margin-bottom:12px"><div class="kpis" style="grid-template-columns:1fr">${aptSummary(rows)}</div><div>${monthGrid(base)}</div></div>
   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">${aptFilters().replace(/<div class="chips">/g, '<div class="chips" style="flex-wrap:wrap">')}</div>
-  <div class="tblwrap"><table class="tbl num"><thead><tr><th>입주</th><th class="l">단지명</th><th class="l">지역</th><th class="l">유형</th><th>세대</th><th class="l">상태</th><th class="l">박람회</th><th>판매</th><th>달성률</th><th class="l">주관사</th><th class="l">고객초청</th><th class="l">배정점</th><th class="l">메모</th></tr></thead><tbody>${tr || '<tr><td colspan="13" class="l empty">해당 단지가 없습니다</td></tr>'}</tbody></table></div>`;
+  <div class="tblwrap"><table class="tbl num"><thead><tr><th>입주</th><th class="l">단지명</th><th class="l">지역</th><th class="l">유형</th><th>세대</th><th class="l">상태</th><th class="l">박람회</th><th>판매<small class="u">백만</small></th><th>달성률</th><th class="l">주관사</th><th class="l">고객초청</th><th class="l">배정점</th><th class="l">메모</th></tr></thead><tbody>${tr || '<tr><td colspan="13" class="l empty">해당 단지가 없습니다</td></tr>'}</tbody></table></div>`;
 }
 
 /* ---------- 상세 / 편집 ---------- */
@@ -714,7 +737,7 @@ function openEvent(id) {
     <div class="kv">${kv.map(([k, v]) => `<div>${k}</div><div class="num">${v}</div>`).join('')}</div>
     ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
     ${e.shops && e.shops.length ? (() => { const sorted = e.shops.slice().sort((a, b) => (b.a || 0) - (a.a || 0)); const tc = sorted.reduce((t, x) => t + (x.c || 0), 0), ta = sorted.reduce((t, x) => t + (x.a || 0), 0);
-      return `<h2 class="sec">매장별 실적 <small>${sorted.length}개 매장 · ${fmt(tc)}건 · ${fmt(ta)} 백만원</small></h2><div class="tblwrap" style="max-height:none"><table class="tbl num"><thead><tr><th class="l">매장</th><th></th><th>건수</th><th>금액</th><th>객단가</th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(sorted, ta)}</tbody></table></div>${e.shopNote ? `<div class="note">${esc(e.shopNote)}</div>` : ''}`; })() : (e._done && e.y >= 2026 ? '<div class="note">매장별 실적이 아직 없습니다. PC 편집 모드에서 입력할 수 있습니다.</div>' : '')}
+      return `<h2 class="sec">매장별 실적 <small>${sorted.length}개 매장 · ${fmt(tc)}건 · ${fmt(ta)} 백만원</small></h2><div class="tblwrap" style="max-height:none"><table class="tbl num"><thead><tr><th class="l">매장</th><th></th><th>건수</th><th>금액<small class="u">백만</small></th><th>객단가<small class="u">백만</small></th><th>비중</th><th class="bcol"></th></tr></thead><tbody>${shopRows(sorted, ta)}</tbody></table></div>${e.shopNote ? `<div class="note">${esc(e.shopNote)}</div>` : ''}`; })() : (e._done && e.y >= 2026 ? '<div class="note">매장별 실적이 아직 없습니다. PC 편집 모드에서 입력할 수 있습니다.</div>' : '')}
     ${apt ? `<h2 class="sec">입주단지 연결</h2>${aptCard(apt)}` : ''}`);
 }
 function editEvent(e, isNew) {
